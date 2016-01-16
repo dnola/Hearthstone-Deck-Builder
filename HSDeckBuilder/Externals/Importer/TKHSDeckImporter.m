@@ -36,6 +36,12 @@
     if ([urlString isMatch:RX(@"icy-veins.com/hearthstone/")]) {
         return TKHSDeckImporterWebsite_icy_veins;
     }
+    
+    if ([urlString isMatch:RX(@".txt")]) {
+        return TKHSDeckImporterLocal;
+    }
+    
+    
     return TKHSDeckImporterWebsite_unsupported;
 }
 
@@ -63,7 +69,11 @@
                                 success:success
                                    fail:fail];
             break;
-            
+        case TKHSDeckImporterLocal:
+            [self importLocal: urlString
+                      success:success
+                         fail:fail];
+            break;
         default:
             if (fail) {
                 fail(@"URL not supported");
@@ -73,10 +83,27 @@
     
 }
 
++ (void)importLocal:(NSString*)urlString
+            success:(void (^)(Deck* deck))success
+               fail:(void (^)(NSString* error))fail {
+    
+    Deck *deck = [Deck new];
+    
+    NSString *fileContents = [NSString stringWithContentsOfFile:urlString encoding:NSUTF8StringEncoding error:NULL];
+    for (NSString *line in [fileContents componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+        Card *card = [Card new];
+        card.name = [line substringFromIndex:2];
+        card.count = [line substringToIndex:1].intValue;
+        NSLog(@"Card: (%ld) %@", (long)card.count, card.name);
+        [deck.cards addObject:card];
+    }
+    
+    success(deck);
+}
 + (void)importHearthPwnWithURL:(NSString*)urlString
                        success:(void (^)(Deck*))success
                           fail:(void (^)(NSString*))fail {
-
+    
     if ([self websiteTypeFromURL:urlString] != TKHSDeckImporterWebsite_hearthpwn) {
         if (fail) fail(@"URL not supported");
         return;
@@ -92,39 +119,39 @@
     [manager GET:query
       parameters:nil
          success:^(AFHTTPRequestOperation *operation, id responseObject) {
-        TFHpple * doc = [TFHpple hppleWithHTMLData:responseObject];
-        
-        NSArray *cardNameNodes = [doc searchWithXPathQuery:@"//aside//td[contains(@class, 'col-name')]"];
-        if ([cardNameNodes count] == 0) {
-            if (fail) fail(@"Website format is not recognized");
-            return;
-        }
-        else {
-            Deck *deck = [Deck new];
-            
-            for (TFHppleElement *content in cardNameNodes) {
-                TFHppleElement *element = [[content firstChildWithTagName:@"b"] firstChildWithTagName:@"a"];
-                if (!element) {
-                    continue;
-                }
-                // parse
-                NSString *cardName = [element text];
-                NSString *count = [[[content children] lastObject] content];
-                int cardCount = [[count firstMatch:RX(@"(\\d+)")] intValue]; // get first number
-                
-                // generate model
-                Card *card = [Card new];
-                card.name = cardName;
-                card.count = cardCount;
-                NSLog(@"Card: (%ld) %@", (long)card.count, card.name);
-                [deck.cards addObject:card];
-            }
-            if (success) success(deck);
-        }
+             TFHpple * doc = [TFHpple hppleWithHTMLData:responseObject];
              
-    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-        if (fail) fail([error localizedDescription]);
-    }];
+             NSArray *cardNameNodes = [doc searchWithXPathQuery:@"//aside//td[contains(@class, 'col-name')]"];
+             if ([cardNameNodes count] == 0) {
+                 if (fail) fail(@"Website format is not recognized");
+                 return;
+             }
+             else {
+                 Deck *deck = [Deck new];
+                 
+                 for (TFHppleElement *content in cardNameNodes) {
+                     TFHppleElement *element = [[content firstChildWithTagName:@"b"] firstChildWithTagName:@"a"];
+                     if (!element) {
+                         continue;
+                     }
+                     // parse
+                     NSString *cardName = [element text];
+                     NSString *count = [[[content children] lastObject] content];
+                     int cardCount = [[count firstMatch:RX(@"(\\d+)")] intValue]; // get first number
+                     
+                     // generate model
+                     Card *card = [Card new];
+                     card.name = cardName;
+                     card.count = cardCount;
+                     NSLog(@"Card: (%ld) %@", (long)card.count, card.name);
+                     [deck.cards addObject:card];
+                 }
+                 if (success) success(deck);
+             }
+             
+         } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+             if (fail) fail([error localizedDescription]);
+         }];
     
     [loginRequest start];
 }
@@ -138,7 +165,7 @@
         return;
     }
     
-//    NSString* query = [NSString stringWithFormat:@"http://www.hearthpwn.com/decks/%@", dockerId];
+    //    NSString* query = [NSString stringWithFormat:@"http://www.hearthpwn.com/decks/%@", dockerId];
     
     AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
@@ -155,7 +182,7 @@
              }
              
              Deck *deck = [Deck new];
-
+             
              for (TFHppleElement *content in nodes) {
                  TFHppleElement *cardNameElement = [content firstChildWithTagName:@"a"];
                  if (!cardNameElement) {
@@ -165,7 +192,7 @@
                  // parse
                  NSString *cardName = [cardNameElement text];
                  int cardCount = [[[content text] firstMatch:RX(@"(\\d+)")] intValue]; // get first number
-
+                 
                  // generate model
                  Card *card = [Card new];
                  card.name = cardName;
@@ -173,9 +200,9 @@
                  NSLog(@"Card: (%ld) %@", (long)card.count, card.name);
                  [deck.cards addObject:card];
              }
-
+             
              success(deck);
-
+             
          } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
              fail([error localizedDescription]);
          }];

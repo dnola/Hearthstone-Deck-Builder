@@ -13,6 +13,8 @@ typedef NS_ENUM(NSInteger, TKHSDeckImporterWebsite) {
     TKHSDeckImporterWebsite_unsupported,
     TKHSDeckImporterWebsite_hearthpwn,
     TKHSDeckImporterWebsite_icy_veins,
+    TKHSDeckImporterLocal,
+    
 };
 
 @interface TKHSDeckImporter : NSObject
